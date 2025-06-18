@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SSH Client Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f0f0f0;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .success { background-color: #d4edda; color: #155724; }
+        .info { background-color: #d1ecf1; color: #0c5460; }
+        .warning { background-color: #fff3cd; color: #856404; }
+    </style>
+</head>
+<body>
+    <h1>SSH Client 테스트 결과</h1>
+    
+    <div class="status success">
+        ✅ <strong>백엔드 서버</strong>: http://localhost:8000 - 정상 동작
+    </div>
+    
+    <div class="status success">
+        ✅ <strong>프론트엔드 서버</strong>: http://localhost:3000 - 정상 동작
+    </div>
+    
+    <div class="status success">
+        ✅ <strong>WebSocket 연결</strong>: 정상 동작
+    </div>
+    
+    <div class="status success">
+        ✅ <strong>SSH 연결</strong>: 192.168.10.100:22 - 정상 동작
+    </div>
+    
+    <div class="status success">
+        ✅ <strong>명령어 실행</strong>: whoami 명령어 실행 성공 (결과: jrpark)
+    </div>
+    
+    <div class="status info">
+        <strong>프로젝트 구조:</strong>
+        <pre>
+term/
+├── backend/                 # FastAPI + WebSocket + SSH
+│   ├── main.py             # 메인 서버 파일
+│   └── requirements.txt    # Python 의존성
+├── frontend/               # Vue.js + TypeScript + xterm.js
+│   ├── src/
+│   │   ├── App.vue        # 메인 Vue 컴포넌트
+│   │   ├── main.ts        # 엔트리 포인트
+│   │   └── style.css      # 스타일시트
+│   ├── package.json       # Node.js 의존성
+│   └── index.html         # HTML 템플릿
+└── README.md              # 프로젝트 설명
+        </pre>
+    </div>
+    
+    <div class="status info">
+        <strong>사용 방법:</strong>
+        <ol>
+            <li>백엔드 서버 실행: <code>cd backend && python main.py</code></li>
+            <li>프론트엔드 서버 실행: <code>cd frontend && npm run dev</code></li>
+            <li>브라우저에서 <code>http://localhost:3000</code> 접속</li>
+            <li>SSH 로그인 정보 입력 후 연결</li>
+            <li>터미널에서 명령어 실행</li>
+        </ol>
+    </div>
+    
+    <div class="status warning">
+        <strong>주요 기능:</strong>
+        <ul>
+            <li>웹 기반 SSH 클라이언트 (PuTTY 대체)</li>
+            <li>xterm.js를 사용한 실제 터미널 UI</li>
+            <li>다중 SSH 세션 지원 (탭 기능)</li>
+            <li>실시간 WebSocket 통신</li>
+            <li>ANSI 색상 코드 지원</li>
+        </ul>
+    </div>
+</body>
+</html>
