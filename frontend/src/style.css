@@ -16,6 +16,7 @@ body {
   height: 100vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .login-form {
@@ -80,9 +81,11 @@ body {
 }
 
 .terminal-container {
-  flex: 1;
   padding: 10px;
   background-color: #000000;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
 }
 
 .terminal {
@@ -94,24 +97,74 @@ body {
   display: flex;
   background-color: #2d2d2d;
   border-bottom: 1px solid #555;
+  flex-shrink: 0;
+}
+
+.tab-container {
+  display: flex;
+  align-items: center;
+  background-color: #3c3c3c;
+  border-right: 1px solid #555;
+  position: relative;
+}
+
+.tab-container.active {
+  background-color: #007acc;
+}
+
+.tab-container:hover {
+  background-color: #4c4c4c;
+}
+
+.tab-container.active:hover {
+  background-color: #005a9e;
 }
 
 .tab {
   padding: 10px 20px;
-  background-color: #3c3c3c;
+  background-color: transparent;
   border: none;
   color: #cccccc;
   cursor: pointer;
-  border-right: 1px solid #555;
+  flex: 1;
+  text-align: left;
 }
 
-.tab.active {
-  background-color: #007acc;
+.tab-container.active .tab {
   color: white;
 }
 
-.tab:hover {
-  background-color: #4c4c4c;
+.tab-close-btn {
+  padding: 4px 8px;
+  background-color: transparent;
+  border: none;
+  color: #cccccc;
+  cursor: pointer;
+  font-size: 16px;
+  font-weight: bold;
+  margin-right: 8px;
+  border-radius: 3px;
+  line-height: 1;
+  min-width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.tab-close-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  color: #ff6b6b;
+}
+
+.tab-container.active .tab-close-btn {
+  color: white;
+}
+
+.tab-container.active .tab-close-btn:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+  color: #ff6b6b;
 }
 
 .new-tab-btn {
@@ -131,4 +184,80 @@ body {
   color: #ff6b6b;
   margin-top: 10px;
   text-align: center;
+}
+
+/* 리사이저 스타일 */
+.resizer {
+  height: 8px;
+  background-color: #2d2d2d;
+  cursor: ns-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-top: 1px solid #555;
+  position: relative;
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.resizer:hover {
+  background-color: #007acc;
+}
+
+.resizer-handle {
+  width: 40px;
+  height: 3px;
+  background-color: #666;
+  border-radius: 2px;
+  transition: background-color 0.2s ease;
+}
+
+.resizer:hover .resizer-handle {
+  background-color: #ffffff;
+}
+
+.resizer:active {
+  background-color: #005a9e;
+}
+
+/* 컨텍스트 메뉴 스타일 */
+.context-menu {
+  position: fixed;
+  background-color: #2d2d2d;
+  border: 1px solid #555;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  min-width: 180px;
+  padding: 4px 0;
+}
+
+.context-menu-item {
+  padding: 8px 16px;
+  color: #cccccc;
+  cursor: pointer;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  transition: background-color 0.2s ease;
+}
+
+.context-menu-item:hover {
+  background-color: #007acc;
+  color: #ffffff;
+}
+
+.context-menu-separator {
+  height: 1px;
+  background-color: #555;
+  margin: 4px 0;
+}
+
+/* 터미널 선택 영역 스타일 개선 */
+.terminal .xterm-selection {
+  background-color: rgba(255, 255, 255, 0.3) !important;
+}
+
+.terminal .xterm-viewport {
+  background-color: transparent !important;
 }

@@ -126,6 +126,12 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             elif message["type"] == "command":
                 # 명령어 전송
                 ssh_session.send_command(message["data"])
+            
+            elif message["type"] == "disconnect":
+                # 연결 종료 요청
+                print(f"클라이언트 요청으로 세션 종료: {session_id}")
+                ssh_session.disconnect()
+                break
     
     except WebSocketDisconnect:
         print(f"WebSocket 연결 종료: {session_id}")
