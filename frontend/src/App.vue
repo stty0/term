@@ -53,7 +53,7 @@
     </div>
 
     <!-- 터미널 영역 -->
-    <div v-else>
+    <div v-else class="main-container">
       <!-- 탭 영역 -->
       <div class="tabs">
         <div
@@ -80,16 +80,36 @@
         <button class="new-tab-btn" @click="createNewTab">+</button>
       </div>
 
-      <!-- 터미널 컨테이너 -->
-      <div class="terminal-container" :style="{ height: terminalHeight + 'px' }">
-        <div
-          v-for="tab in tabs"
-          :key="tab.id"
-          :ref="el => setTerminalRef(tab.id, el)"
-          class="terminal"
-          :style="{ display: activeTabId === tab.id ? 'block' : 'none' }"
-          @contextmenu="handleContextMenu($event, tab.id)"
-        ></div>
+      <!-- 메인 컨텐츠 영역 -->
+      <div class="content-area">
+        <!-- 터미널 컨테이너 -->
+        <div class="terminal-container" :style="{ height: terminalHeight + 'px' }">
+          <div
+            v-for="tab in tabs"
+            :key="tab.id"
+            :ref="el => setTerminalRef(tab.id, el)"
+            class="terminal"
+            :style="{ display: activeTabId === tab.id ? 'block' : 'none' }"
+            @contextmenu="handleContextMenu($event, tab.id)"
+          ></div>
+        </div>
+        
+        <!-- 리사이저 -->
+        <div 
+          class="resizer"
+          @mousedown="startResize"
+          @touchstart="startResize"
+        >
+          <div class="resizer-handle"></div>
+        </div>
+        
+        <!-- SFTP 파일 탐색기 -->
+        <div class="sftp-manager-container">
+          <SftpFileManager 
+            :session-id="activeTabId" 
+            :connected="isConnected"
+          />
+        </div>
       </div>
       
       <!-- 컨텍스트 메뉴 -->
@@ -110,15 +130,6 @@
           모두 선택 (Ctrl+A)
         </div>
       </div>
-      
-      <!-- 리사이저 -->
-      <div 
-        class="resizer"
-        @mousedown="startResize"
-        @touchstart="startResize"
-      >
-        <div class="resizer-handle"></div>
-      </div>
     </div>
   </div>
 </template>
@@ -127,6 +138,7 @@
 import { ref, onMounted, nextTick } from 'vue'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
+import SftpFileManager from './components/SftpFileManager.vue'
 
 interface ConnectionForm {
   hostname: string
@@ -537,3 +549,282 @@ onMounted(() => {
   })
 })
 </script>
+
+<style scoped>
+/* 기존 스타일들 유지 */
+#app {
+  font-family: Avenir, Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  height: 100vh;
+  background-color: #f0f0f0;
+}
+
+.login-form {
+  max-width: 400px;
+  margin: 100px auto;
+  padding: 2rem;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.login-form h1 {
+  text-align: center;
+  margin-bottom: 2rem;
+  color: #333;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: bold;
+  color: #555;
+}
+
+.form-group input {
+  width: 100%;
+  padding: 0.75rem;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+  box-sizing: border-box;
+}
+
+.form-group input:focus {
+  outline: none;
+  border-color: #007acc;
+  box-shadow: 0 0 0 2px rgba(0, 122, 204, 0.2);
+}
+
+.connect-btn {
+  width: 100%;
+  padding: 0.75rem;
+  background: #007acc;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.connect-btn:hover:not(:disabled) {
+  background: #005a9e;
+}
+
+.connect-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.error-message {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: #ffe6e6;
+  color: #d00;
+  border: 1px solid #ffcccc;
+  border-radius: 4px;
+  text-align: center;
+}
+
+/* 터미널 관련 스타일 */
+.tabs {
+  display: flex;
+  background: #2d2d2d;
+  border-bottom: 1px solid #444;
+  overflow-x: auto;
+}
+
+.tab-container {
+  display: flex;
+  align-items: center;
+  background: #3c3c3c;
+  border-right: 1px solid #555;
+  min-width: fit-content;
+}
+
+.tab-container.active {
+  background: #1e1e1e;
+}
+
+.tab {
+  padding: 8px 16px;
+  background: none;
+  border: none;
+  color: #ccc;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.2s;
+}
+
+.tab:hover {
+  color: #fff;
+}
+
+.tab-container.active .tab {
+  color: #fff;
+}
+
+.tab-close-btn {
+  padding: 4px 8px;
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 16px;
+  cursor: pointer;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.tab-close-btn:hover {
+  color: #ff6b6b;
+}
+
+.new-tab-btn {
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  color: #ccc;
+  font-size: 16px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.new-tab-btn:hover {
+  color: #fff;
+  background: #404040;
+}
+
+.terminal-container {
+  position: relative;
+  background: #000;
+  overflow: hidden;
+}
+
+.terminal {
+  width: 100%;
+  height: 100%;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+.context-menu {
+  position: fixed;
+  background: #2d2d2d;
+  border: 1px solid #555;
+  border-radius: 4px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+  min-width: 150px;
+}
+
+.context-menu-item {
+  padding: 8px 12px;
+  color: #ccc;
+  cursor: pointer;
+  font-size: 12px;
+  transition: background-color 0.2s;
+}
+
+.context-menu-item:hover {
+  background: #404040;
+  color: #fff;
+}
+
+.context-menu-separator {
+  height: 1px;
+  background: #555;
+  margin: 4px 0;
+}
+
+.resizer {
+  height: 10px;
+  background: #3c3c3c;
+  border-top: 1px solid #555;
+  border-bottom: 1px solid #555;
+  cursor: ns-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.resizer:hover {
+  background: #4a4a4a;
+}
+
+.resizer-handle {
+  width: 50px;
+  height: 3px;
+  background: #666;
+  border-radius: 2px;
+}
+
+.resizer:hover .resizer-handle {
+  background: #888;
+}
+
+/* 메인 컨테이너 반응형 스타일 */
+.main-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.content-area {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0; /* 중요: flex container에서 overflow가 작동하도록 함 */
+  overflow: hidden;
+}
+
+/* SFTP 파일 탐색기 컨테이너 스타일 */
+.sftp-manager-container {
+  flex: 1;
+  min-height: 300px;
+  background: #f5f5f5;
+  overflow: auto; /* 스크롤바 추가 */
+}
+
+/* 반응형 디자인 */
+@media (max-height: 600px) {
+  .sftp-manager-container {
+    min-height: 200px;
+  }
+}
+
+@media (max-height: 500px) {
+  .terminal-container {
+    min-height: 150px !important;
+  }
+  
+  .sftp-manager-container {
+    min-height: 150px;
+  }
+}
+
+/* 작은 화면에서 스크롤 최적화 */
+@media (max-width: 768px) {
+  .sftp-manager-container {
+    font-size: 12px;
+  }
+  
+  .tabs {
+    font-size: 11px;
+  }
+}
+
+/* 컨텐츠가 화면을 벗어나지 않도록 보장 */
+.terminal-container,
+.sftp-manager-container {
+  max-height: calc(100vh - 100px); /* 탭과 여유 공간 고려 */
+}
+</style>
