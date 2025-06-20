@@ -80,44 +80,16 @@
         <button class="new-tab-btn" @click="createNewTab">+</button>
       </div>
 
-      <!-- 메인 컨텐츠 영역 -->
-      <div class="content-area">
-        <!-- 터미널 컨테이너 -->
-        <div class="terminal-container" :style="{ height: terminalHeight + 'px' }">
-          <div
-            v-for="tab in tabs"
-            :key="tab.id"
-            :ref="el => setTerminalRef(tab.id, el)"
-            class="terminal"
-            :style="{ display: activeTabId === tab.id ? 'block' : 'none' }"
-            @contextmenu="handleContextMenu($event, tab.id)"
-          ></div>
-        </div>
-        
-        <!-- 리사이저 -->
-        <div 
-          class="resizer"
-          :class="{ 'resizing': isResizing }"
-          @mousedown="startResize"
-          @touchstart="startResize"
-        >
-          <div class="resizer-handle">
-            <div class="resizer-dots">
-              <div class="dot"></div>
-              <div class="dot"></div>
-              <div class="dot"></div>
-            </div>
-          </div>
-          <div class="resizer-tooltip">드래그하여 크기 조정</div>
-        </div>
-        
-        <!-- SFTP 파일 탐색기 -->
-        <div class="sftp-manager-container">
-          <SftpFileManager 
-            :session-id="activeTabId" 
-            :connected="isConnected"
-          />
-        </div>
+      <!-- 터미널 컨테이너 -->
+      <div class="terminal-container">
+        <div
+          v-for="tab in tabs"
+          :key="tab.id"
+          :ref="el => setTerminalRef(tab.id, el)"
+          class="terminal"
+          :style="{ display: activeTabId === tab.id ? 'block' : 'none' }"
+          @contextmenu="handleContextMenu($event, tab.id)"
+        ></div>
       </div>
       
       <!-- 컨텍스트 메뉴 -->
@@ -146,7 +118,6 @@
 import { ref, onMounted, nextTick } from 'vue'
 import { Terminal } from 'xterm'
 import { FitAddon } from 'xterm-addon-fit'
-import SftpFileManager from './components/SftpFileManager.vue'
 
 interface ConnectionForm {
   hostname: string
@@ -168,12 +139,6 @@ const errorMessage = ref('')
 const activeTabId = ref('')
 const tabs = ref<Tab[]>([])
 const terminalRefs = ref<{ [key: string]: HTMLElement }>({})
-// 탭과 리사이저 높이를 고려한 초기 터미널 높이 설정
-const tabsHeight = 41
-const resizerHeight = 10
-const initialHeight = Math.max(300, window.innerHeight - tabsHeight - resizerHeight - 100) // 여유 공간 100px
-const terminalHeight = ref(initialHeight)
-const isResizing = ref(false)
 
 const connectionForm = ref<ConnectionForm>({
   hostname: '192.168.10.100',
@@ -248,50 +213,6 @@ const selectAll = () => {
     tab.terminal.selectAll()
   }
   contextMenu.value.show = false
-}
-
-// 리사이즈 관련 함수들
-const startResize = (event: MouseEvent | TouchEvent) => {
-  isResizing.value = true
-  const startY = 'touches' in event ? event.touches[0].clientY : event.clientY
-  const startHeight = terminalHeight.value
-
-  const handleMouseMove = (moveEvent: MouseEvent | TouchEvent) => {
-    if (!isResizing.value) return
-    
-    const currentY = 'touches' in moveEvent ? moveEvent.touches[0].clientY : moveEvent.clientY
-    const deltaY = currentY - startY
-    // 탭 영역과 리사이저 높이를 고려하여 최대 높이 계산 (탭: ~41px, 리사이저: ~10px)
-    const tabsHeight = 41
-    const resizerHeight = 10
-    const maxHeight = window.innerHeight - tabsHeight - resizerHeight
-    const newHeight = Math.max(200, Math.min(maxHeight, startHeight + deltaY))
-    
-    terminalHeight.value = newHeight
-    
-    // 활성 터미널의 크기 조정
-    const activeTab = tabs.value.find(t => t.id === activeTabId.value)
-    if (activeTab && activeTab.fitAddon) {
-      setTimeout(() => {
-        activeTab.fitAddon!.fit()
-      }, 10)
-    }
-  }
-
-  const handleMouseUp = () => {
-    isResizing.value = false
-    document.removeEventListener('mousemove', handleMouseMove)
-    document.removeEventListener('mouseup', handleMouseUp)
-    document.removeEventListener('touchmove', handleMouseMove)
-    document.removeEventListener('touchend', handleMouseUp)
-  }
-
-  document.addEventListener('mousemove', handleMouseMove)
-  document.addEventListener('mouseup', handleMouseUp)
-  document.addEventListener('touchmove', handleMouseMove)
-  document.addEventListener('touchend', handleMouseUp)
-  
-  event.preventDefault()
 }
 
 const createNewTab = async () => {
@@ -559,12 +480,19 @@ onMounted(() => {
 </script>
 
 <style scoped>
-/* 기존 스타일들 유지 */
+/* 기본 스타일 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
 #app {
   font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   height: 100vh;
+  width: 100vw;
   background-color: #f0f0f0;
 }
 
@@ -641,11 +569,20 @@ onMounted(() => {
 }
 
 /* 터미널 관련 스타일 */
+.main-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+  background-color: #2d2d2d;
+}
+
 .tabs {
   display: flex;
   background: #2d2d2d;
   border-bottom: 1px solid #444;
   overflow-x: auto;
+  flex-shrink: 0;
 }
 
 .tab-container {
@@ -710,9 +647,10 @@ onMounted(() => {
 }
 
 .terminal-container {
-  position: relative;
-  background: #000;
+  flex: 1;
+  background: #000000;
   overflow: hidden;
+  position: relative;
 }
 
 .terminal {
@@ -749,166 +687,5 @@ onMounted(() => {
   height: 1px;
   background: #555;
   margin: 4px 0;
-}
-
-.resizer {
-  height: 15px;
-  background: #3c3c3c;
-  border-top: 1px solid #555;
-  border-bottom: 1px solid #555;
-  cursor: ns-resize;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  transition: all 0.2s ease;
-  user-select: none;
-}
-
-.resizer:hover {
-  background: #4a4a4a;
-  height: 18px;
-}
-
-.resizer.resizing {
-  background: #007acc;
-  height: 18px;
-  box-shadow: 0 0 10px rgba(0, 122, 204, 0.3);
-}
-
-.resizer-handle {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 80px;
-  height: 12px;
-  background: #666;
-  border-radius: 6px;
-  position: relative;
-  transition: all 0.2s ease;
-}
-
-.resizer:hover .resizer-handle {
-  background: #888;
-  transform: scale(1.1);
-}
-
-.resizer.resizing .resizer-handle {
-  background: #fff;
-  transform: scale(1.2);
-}
-
-.resizer-dots {
-  display: flex;
-  gap: 3px;
-  align-items: center;
-}
-
-.dot {
-  width: 3px;
-  height: 3px;
-  background: #ccc;
-  border-radius: 50%;
-  transition: all 0.2s ease;
-}
-
-.resizer:hover .dot {
-  background: #fff;
-  transform: scale(1.2);
-}
-
-.resizer.resizing .dot {
-  background: #007acc;
-  transform: scale(1.5);
-}
-
-.resizer-tooltip {
-  position: absolute;
-  top: -30px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #2d2d2d;
-  color: #ccc;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 11px;
-  white-space: nowrap;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
-  z-index: 1000;
-  border: 1px solid #555;
-}
-
-.resizer:hover .resizer-tooltip {
-  opacity: 1;
-}
-
-.resizer-tooltip::after {
-  content: '';
-  position: absolute;
-  top: 100%;
-  left: 50%;
-  transform: translateX(-50%);
-  border: 4px solid transparent;
-  border-top-color: #2d2d2d;
-}
-
-/* 메인 컨테이너 반응형 스타일 */
-.main-container {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
-}
-
-.content-area {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0; /* 중요: flex container에서 overflow가 작동하도록 함 */
-  overflow: hidden;
-}
-
-/* SFTP 파일 탐색기 컨테이너 스타일 */
-.sftp-manager-container {
-  flex: 1;
-  min-height: 300px;
-  background: #f5f5f5;
-  overflow: auto; /* 스크롤바 추가 */
-}
-
-/* 반응형 디자인 */
-@media (max-height: 600px) {
-  .sftp-manager-container {
-    min-height: 200px;
-  }
-}
-
-@media (max-height: 500px) {
-  .terminal-container {
-    min-height: 150px !important;
-  }
-  
-  .sftp-manager-container {
-    min-height: 150px;
-  }
-}
-
-/* 작은 화면에서 스크롤 최적화 */
-@media (max-width: 768px) {
-  .sftp-manager-container {
-    font-size: 12px;
-  }
-  
-  .tabs {
-    font-size: 11px;
-  }
-}
-
-/* 컨텐츠가 화면을 벗어나지 않도록 보장 */
-.terminal-container,
-.sftp-manager-container {
-  max-height: calc(100vh - 100px); /* 탭과 여유 공간 고려 */
 }
 </style>
