@@ -77,7 +77,14 @@
             ×
           </button>
         </div>
-        <button class="new-tab-btn" @click="createNewTab">+</button>
+        <button 
+          class="new-tab-btn" 
+          @click="createNewTab"
+          :disabled="tabs.length >= 5"
+          :title="tabs.length >= 5 ? '최대 5개 세션까지 생성 가능합니다' : '새 세션 추가'"
+        >
+          +
+        </button>
       </div>
 
       <!-- 터미널 컨테이너 -->
@@ -102,7 +109,7 @@
         <div class="context-menu-item" @click="copySelection">
           복사 (Ctrl+C)
         </div>
-        <div class="context-menu-item" @click="pasteFromClipboard">
+        <div class="context-menu-item" @click="pasteFromClipboardMenu">
           붙여넣기 (Ctrl+V)
         </div>
         <div class="context-menu-separator"></div>
@@ -172,36 +179,76 @@ const handleContextMenu = (event: MouseEvent, tabId: string) => {
   }
 }
 
-const copySelection = async () => {
+const copySelection = () => {
   const tab = tabs.value.find(t => t.id === contextMenu.value.tabId)
   if (tab && tab.terminal) {
     const selection = tab.terminal.getSelection()
     if (selection) {
+      // 간단한 fallback 방식으로 복사
+      const textArea = document.createElement('textarea')
+      textArea.value = selection
+      textArea.style.position = 'fixed'
+      textArea.style.left = '-9999px'
+      document.body.appendChild(textArea)
+      textArea.select()
       try {
-        await navigator.clipboard.writeText(selection)
+        document.execCommand('copy')
+        console.log('복사 완료:', selection.substring(0, 50) + '...')
       } catch (err) {
-        console.error('클립보드 복사 실패:', err)
+        console.error('복사 실패:', err)
       }
+      document.body.removeChild(textArea)
     }
   }
   contextMenu.value.show = false
 }
 
-const pasteFromClipboard = async () => {
+const pasteFromClipboardMenu = async () => {
   const tab = tabs.value.find(t => t.id === contextMenu.value.tabId)
   if (tab && tab.terminal && tab.websocket) {
-    try {
-      const text = await navigator.clipboard.readText()
-      if (text && tab.websocket.readyState === WebSocket.OPEN) {
-        // 컨텍스트 메뉴를 통한 붙여넣기는 직접 WebSocket으로 전송
-        // onData 이벤트를 거치지 않으므로 중복 문제가 없음
-        tab.websocket.send(JSON.stringify({
-          type: 'command',
-          data: text
-        }))
+    const terminalElement = terminalRefs.value[tab.id]
+    if (terminalElement) {
+      // 터미널에 포커스 주기
+      terminalElement.focus()
+      
+      // 1차: navigator.clipboard API 시도
+      try {
+        const text = await navigator.clipboard.readText()
+        if (text && tab.websocket.readyState === WebSocket.OPEN) {
+          console.log('우클릭 붙여넣기 성공:', text.substring(0, 50) + '...')
+          tab.websocket.send(JSON.stringify({
+            type: 'command',
+            data: text
+          }))
+          contextMenu.value.show = false
+          return
+        }
+      } catch (err) {
+        // Clipboard API 실패 시 계속 진행
       }
-    } catch (err) {
-      console.error('클립보드 붙여넣기 실패:', err)
+      
+      // 2차: 키보드 이벤트 시뮬레이션으로 Ctrl+V 발생
+      const keydownEvent = new KeyboardEvent('keydown', {
+        key: 'v',
+        code: 'KeyV',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true
+      })
+      
+      const keyupEvent = new KeyboardEvent('keyup', {
+        key: 'v',
+        code: 'KeyV',
+        ctrlKey: true,
+        bubbles: true,
+        cancelable: true
+      })
+      
+      // 터미널 요소에 키 이벤트 발생
+      terminalElement.dispatchEvent(keydownEvent)
+      terminalElement.dispatchEvent(keyupEvent)
+      
+      console.log('키보드 이벤트 시뮬레이션 시도')
     }
   }
   contextMenu.value.show = false
@@ -216,6 +263,12 @@ const selectAll = () => {
 }
 
 const createNewTab = async () => {
+  // 최대 5개 세션 제한
+  if (tabs.value.length >= 5) {
+    console.warn('최대 5개 세션까지만 생성 가능합니다.')
+    return
+  }
+  
   const tabId = `tab-${Date.now()}`
   const newTab: Tab = {
     id: tabId,
@@ -237,6 +290,13 @@ const switchTab = (tabId: string) => {
   if (tab && tab.fitAddon) {
     setTimeout(() => {
       tab.fitAddon!.fit()
+      // 탭 전환 시 터미널 포커스 보장
+      const terminalElement = terminalRefs.value[tabId]
+      if (terminalElement && tab.terminal) {
+        terminalElement.focus()
+        tab.terminal.focus()
+        console.log('탭 전환 시 포커스 설정:', tabId)
+      }
     }, 100)
   }
 }
@@ -364,36 +424,126 @@ const initializeTerminal = async (tab: Tab) => {
     }
   })
 
-  // 키보드 단축키 처리 - 모든 키 이벤트를 가로채서 처리
-  terminal.attachCustomKeyEventHandler((event) => {
-    // Ctrl+C: 복사
-    if (event.ctrlKey && event.key === 'c' && terminal.hasSelection()) {
-      event.preventDefault()
-      const selection = terminal.getSelection()
-      if (selection) {
-        navigator.clipboard.writeText(selection).catch(err => {
-          console.error('클립보드 복사 실패:', err)
-        })
-      }
-      return false
+  // 터미널이 포커스를 받을 수 있도록 설정
+  terminalElement.setAttribute('tabindex', '0')
+  
+  // 중복 방지를 위한 변수들
+  let lastPasteTime = 0
+  let lastPasteText = ''
+  let isPasting = false
+  
+  // 안전한 붙여넣기 함수
+  const safePaste = (text: string, source: string) => {
+    const currentTime = Date.now()
+    
+    // 중복 방지: 같은 텍스트를 200ms 이내에 붙여넣으려 하면 무시
+    if (text === lastPasteText && (currentTime - lastPasteTime) < 200) {
+      console.log(`중복 붙여넣기 방지됨 (${source})`)
+      return
     }
     
-    // Ctrl+V: 붙여넣기 - 완전히 커스텀 처리
+    // 현재 붙여넣기 중이면 무시
+    if (isPasting) {
+      console.log(`붙여넣기 진행 중, 무시됨 (${source})`)
+      return
+    }
+    
+    if (text && ws.readyState === WebSocket.OPEN) {
+      isPasting = true
+      console.log(`붙여넣기 실행 (${source}):`, text.substring(0, 50) + '...')
+      ws.send(JSON.stringify({
+        type: 'command',
+        data: text
+      }))
+      
+      lastPasteTime = currentTime
+      lastPasteText = text
+      
+      // 200ms 후 플래그 해제
+      setTimeout(() => {
+        isPasting = false
+      }, 200)
+    }
+  }
+
+  // 키보드 이벤트 처리: Ctrl+C, Ctrl+V, Ctrl+A 직접 처리
+  terminal.attachCustomKeyEventHandler((event) => {
+    // Ctrl+C: 선택된 텍스트가 있으면 복사, 없으면 break 신호
+    if (event.ctrlKey && event.key === 'c') {
+      if (terminal.hasSelection()) {
+        // 선택된 텍스트가 있으면 복사 처리
+        event.preventDefault()
+        const selection = terminal.getSelection()
+        if (selection) {
+          // execCommand 방식으로 복사
+          const textArea = document.createElement('textarea')
+          textArea.value = selection
+          textArea.style.position = 'fixed'
+          textArea.style.left = '-9999px'
+          document.body.appendChild(textArea)
+          textArea.select()
+          try {
+            document.execCommand('copy')
+            console.log('복사 완료 (Ctrl+C):', selection.substring(0, 50) + '...')
+          } catch (err) {
+            console.error('복사 실패:', err)
+          }
+          document.body.removeChild(textArea)
+        }
+        return false // 이벤트 중단 (SSH 서버로 전송하지 않음)
+      }
+      // 선택된 텍스트가 없으면 break 신호로 SSH 서버에 전송
+      return true
+    }
+    
+    // Ctrl+V: 붙여넣기 (직접 처리)
     if (event.ctrlKey && event.key === 'v') {
       event.preventDefault()
-      event.stopPropagation()
       
-      navigator.clipboard.readText().then(text => {
-        if (text && ws.readyState === WebSocket.OPEN) {
-          // 직접 WebSocket으로 전송 (onData 이벤트를 거치지 않음)
-          ws.send(JSON.stringify({
-            type: 'command',
-            data: text
-          }))
-        }
-      }).catch(err => {
-        console.error('클립보드 붙여넣기 실패:', err)
-      })
+      // navigator.clipboard API 시도
+      if (navigator.clipboard && navigator.clipboard.readText) {
+        navigator.clipboard.readText().then(text => {
+          safePaste(text, 'Ctrl+V clipboard')
+        }).catch(err => {
+          console.error('Ctrl+V 붙여넣기 실패:', err)
+          // fallback: 임시 textarea 생성하여 붙여넣기 시도
+          const tempTextarea = document.createElement('textarea')
+          tempTextarea.style.position = 'fixed'
+          tempTextarea.style.left = '-9999px'
+          tempTextarea.style.opacity = '0'
+          document.body.appendChild(tempTextarea)
+          tempTextarea.focus()
+          
+          // execCommand paste 시도
+          setTimeout(() => {
+            if (document.execCommand('paste')) {
+              const pastedText = tempTextarea.value
+              safePaste(pastedText, 'Ctrl+V fallback')
+            }
+            document.body.removeChild(tempTextarea)
+            terminalElement.focus()
+          }, 10)
+        })
+      } else {
+        // clipboard API가 없는 경우 fallback
+        console.log('Clipboard API 없음, fallback 시도')
+        const tempTextarea = document.createElement('textarea')
+        tempTextarea.style.position = 'fixed'
+        tempTextarea.style.left = '-9999px'
+        tempTextarea.style.opacity = '0'
+        document.body.appendChild(tempTextarea)
+        tempTextarea.focus()
+        
+        setTimeout(() => {
+          if (document.execCommand('paste')) {
+            const pastedText = tempTextarea.value
+            safePaste(pastedText, 'Ctrl+V no-API fallback')
+          }
+          document.body.removeChild(tempTextarea)
+          terminalElement.focus()
+        }, 10)
+      }
+      
       return false
     }
     
@@ -404,34 +554,41 @@ const initializeTerminal = async (tab: Tab) => {
       return false
     }
     
+    // 나머지는 xterm.js 기본 동작 허용
     return true
   })
 
-  // 모든 붙여넣기 관련 이벤트 차단
+  // paste 이벤트도 중복 방지 처리
   terminalElement.addEventListener('paste', (event) => {
-    event.preventDefault()
-    event.stopPropagation()
-    event.stopImmediatePropagation()
-  }, true)
-
-  // keydown 이벤트에서도 Ctrl+V 차단
-  terminalElement.addEventListener('keydown', (event) => {
-    if (event.ctrlKey && event.key === 'v') {
-      event.preventDefault()
-      event.stopPropagation()
-      event.stopImmediatePropagation()
+    const text = (event.clipboardData || (window as any).clipboardData)?.getData('text')
+    if (text) {
+      event.preventDefault() // 기본 xterm 붙여넣기 방지
+      safePaste(text, 'paste event')
     }
-  }, true)
+  })
 
-  // input 이벤트에서도 붙여넣기 차단
-  terminalElement.addEventListener('input', (event: Event) => {
-    const inputEvent = event as InputEvent
-    if (inputEvent.inputType === 'insertFromPaste') {
-      event.preventDefault()
-      event.stopPropagation()
-      event.stopImmediatePropagation()
-    }
-  }, true)
+  // 터미널 클릭 시 포커스 보장 (강화)
+  const ensureTerminalFocus = () => {
+    // 터미널 요소에 포커스
+    terminalElement.focus()
+    // xterm 터미널 자체에도 포커스
+    terminal.focus()
+    console.log('터미널 포커스 설정됨')
+  }
+  
+  terminalElement.addEventListener('click', ensureTerminalFocus)
+  terminalElement.addEventListener('mousedown', ensureTerminalFocus)
+  
+  // 터미널 컨테이너에도 클릭 이벤트 추가
+  const terminalContainer = terminalElement.parentElement
+  if (terminalContainer) {
+    terminalContainer.addEventListener('click', (e) => {
+      // 터미널 영역 클릭 시에만 포커스 설정
+      if (e.target === terminalElement || terminalElement.contains(e.target as Node)) {
+        ensureTerminalFocus()
+      }
+    })
+  }
 
   // 윈도우 리사이즈 처리
   window.addEventListener('resize', () => {
@@ -641,9 +798,15 @@ onMounted(() => {
   transition: color 0.2s;
 }
 
-.new-tab-btn:hover {
+.new-tab-btn:hover:not(:disabled) {
   color: #fff;
   background: #404040;
+}
+
+.new-tab-btn:disabled {
+  color: #666;
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .terminal-container {
@@ -658,6 +821,11 @@ onMounted(() => {
   height: 100%;
   padding: 10px;
   box-sizing: border-box;
+  outline: none;
+}
+
+.terminal:focus {
+  outline: none;
 }
 
 .context-menu {
