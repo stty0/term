@@ -97,10 +97,18 @@
         <!-- 리사이저 -->
         <div 
           class="resizer"
+          :class="{ 'resizing': isResizing }"
           @mousedown="startResize"
           @touchstart="startResize"
         >
-          <div class="resizer-handle"></div>
+          <div class="resizer-handle">
+            <div class="resizer-dots">
+              <div class="dot"></div>
+              <div class="dot"></div>
+              <div class="dot"></div>
+            </div>
+          </div>
+          <div class="resizer-tooltip">드래그하여 크기 조정</div>
         </div>
         
         <!-- SFTP 파일 탐색기 -->
@@ -744,7 +752,7 @@ onMounted(() => {
 }
 
 .resizer {
-  height: 10px;
+  height: 15px;
   background: #3c3c3c;
   border-top: 1px solid #555;
   border-bottom: 1px solid #555;
@@ -753,21 +761,97 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   position: relative;
+  transition: all 0.2s ease;
+  user-select: none;
 }
 
 .resizer:hover {
   background: #4a4a4a;
+  height: 18px;
+}
+
+.resizer.resizing {
+  background: #007acc;
+  height: 18px;
+  box-shadow: 0 0 10px rgba(0, 122, 204, 0.3);
 }
 
 .resizer-handle {
-  width: 50px;
-  height: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 12px;
   background: #666;
-  border-radius: 2px;
+  border-radius: 6px;
+  position: relative;
+  transition: all 0.2s ease;
 }
 
 .resizer:hover .resizer-handle {
   background: #888;
+  transform: scale(1.1);
+}
+
+.resizer.resizing .resizer-handle {
+  background: #fff;
+  transform: scale(1.2);
+}
+
+.resizer-dots {
+  display: flex;
+  gap: 3px;
+  align-items: center;
+}
+
+.dot {
+  width: 3px;
+  height: 3px;
+  background: #ccc;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.resizer:hover .dot {
+  background: #fff;
+  transform: scale(1.2);
+}
+
+.resizer.resizing .dot {
+  background: #007acc;
+  transform: scale(1.5);
+}
+
+.resizer-tooltip {
+  position: absolute;
+  top: -30px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #2d2d2d;
+  color: #ccc;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+  z-index: 1000;
+  border: 1px solid #555;
+}
+
+.resizer:hover .resizer-tooltip {
+  opacity: 1;
+}
+
+.resizer-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: #2d2d2d;
 }
 
 /* 메인 컨테이너 반응형 스타일 */
