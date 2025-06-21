@@ -39,9 +39,9 @@ class SSHSession:
             self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             self.client.connect(hostname, port=port, username=username, password=password)
             
-            # PTY 크기와 함께 쉘 호출
+            # PTY 크기와 함께 쉘 호출 - 기본 터미널 타입으로 설정
             self.channel = self.client.invoke_shell(
-                term='xterm-256color',  # 터미널 타입 설정
+                term='xterm',  # 기본 터미널 타입으로 변경 (색상 자동 적용 방지)
                 width=self.terminal_width,
                 height=self.terminal_height,
                 width_pixels=0,
