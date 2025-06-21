@@ -388,13 +388,18 @@ const initializeTerminal = async (tab: Tab) => {
     // 터미널 크기 정보 출력 (디버깅용)
     const dims = fitAddon.proposeDimensions()
     if (dims) {
-      console.log(`터미널 크기: ${dims.cols}x${dims.rows}`)
+      // 한 라인당 문자수를 4개 줄임
+      const adjustedCols = Math.max(1, dims.cols - 4)
+      console.log(`터미널 크기: ${adjustedCols}x${dims.rows} (원본: ${dims.cols}x${dims.rows})`)
+      
+      // 터미널 크기를 조정된 값으로 설정
+      terminal.resize(adjustedCols, dims.rows)
       
       // 서버에 터미널 크기 전송 (PTY 크기 조정용)
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify({
           type: 'resize',
-          cols: dims.cols,
+          cols: adjustedCols,
           rows: dims.rows
         }))
       }
@@ -628,12 +633,20 @@ const initializeTerminal = async (tab: Tab) => {
         // 리사이즈 후 터미널 크기를 서버에 전송
         const dims = tab.fitAddon!.proposeDimensions()
         if (dims && tab.websocket && tab.websocket.readyState === WebSocket.OPEN) {
+          // 한 라인당 문자수를 4개 줄임
+          const adjustedCols = Math.max(1, dims.cols - 4)
+          
+          // 터미널 크기를 조정된 값으로 설정
+          if (tab.terminal) {
+            tab.terminal.resize(adjustedCols, dims.rows)
+          }
+          
           tab.websocket.send(JSON.stringify({
             type: 'resize',
-            cols: dims.cols,
+            cols: adjustedCols,
             rows: dims.rows
           }))
-          console.log(`터미널 리사이즈: ${dims.cols}x${dims.rows}`)
+          console.log(`터미널 리사이즈: ${adjustedCols}x${dims.rows} (원본: ${dims.cols}x${dims.rows})`)
         }
       }, 100)
     }
