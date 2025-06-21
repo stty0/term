@@ -318,6 +318,11 @@ const closeTab = (tabId: string) => {
     tab.websocket.close()
   }
   
+  // ResizeObserver 정리
+  if ((tab as any).resizeObserver) {
+    (tab as any).resizeObserver.disconnect()
+  }
+  
   // 터미널 정리
   if (tab.terminal) {
     tab.terminal.dispose()
@@ -360,17 +365,41 @@ const initializeTerminal = async (tab: Tab) => {
     fontSize: 14,
     fontFamily: 'Courier New, monospace',
     allowTransparency: false,
+    scrollback: 1000,  // 스크롤백 버퍼 크기
+    wordSeparator: ' ()[]{}",\':;',  // 단어 구분자 설정
     theme: {
       background: '#000000',
       foreground: '#ffffff',
       cursor: '#ffffff'
-    }
+    },
+    // 자동 줄바꿈 관련 설정
+    convertEol: true,  // 줄바꿈 문자 변환
+    disableStdin: false  // 표준 입력 활성화
   })
 
   const fitAddon = new FitAddon()
   terminal.loadAddon(fitAddon)
   terminal.open(terminalElement)
-  fitAddon.fit()
+  
+  // 터미널 크기 조정 및 줄바꿈 처리
+  setTimeout(() => {
+    fitAddon.fit()
+    
+    // 터미널 크기 정보 출력 (디버깅용)
+    const dims = fitAddon.proposeDimensions()
+    if (dims) {
+      console.log(`터미널 크기: ${dims.cols}x${dims.rows}`)
+      
+      // 서버에 터미널 크기 전송 (PTY 크기 조정용)
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({
+          type: 'resize',
+          cols: dims.cols,
+          rows: dims.rows
+        }))
+      }
+    }
+  }, 100)
 
   tab.terminal = terminal
   tab.fitAddon = fitAddon
@@ -590,10 +619,36 @@ const initializeTerminal = async (tab: Tab) => {
     })
   }
 
-  // 윈도우 리사이즈 처리
-  window.addEventListener('resize', () => {
-    fitAddon.fit()
-  })
+  // 윈도우 리사이즈 처리 (개선된 버전)
+  const handleResize = () => {
+    if (tab.fitAddon && tab.terminal) {
+      setTimeout(() => {
+        tab.fitAddon!.fit()
+        
+        // 리사이즈 후 터미널 크기를 서버에 전송
+        const dims = tab.fitAddon!.proposeDimensions()
+        if (dims && tab.websocket && tab.websocket.readyState === WebSocket.OPEN) {
+          tab.websocket.send(JSON.stringify({
+            type: 'resize',
+            cols: dims.cols,
+            rows: dims.rows
+          }))
+          console.log(`터미널 리사이즈: ${dims.cols}x${dims.rows}`)
+        }
+      }, 100)
+    }
+  }
+  
+  window.addEventListener('resize', handleResize)
+  
+  // 터미널 컨테이너 크기 변경 감지 (ResizeObserver 사용)
+  if (window.ResizeObserver) {
+    const resizeObserver = new ResizeObserver(handleResize)
+    resizeObserver.observe(terminalElement)
+    
+    // 탭이 닫힐 때 옵저버 정리를 위해 참조 저장
+    ;(tab as any).resizeObserver = resizeObserver
+  }
 }
 
 const connect = async () => {

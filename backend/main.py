@@ -30,6 +30,8 @@ class SSHSession:
         self.channel = None
         self.connected = False
         self.output_queue = queue.Queue()
+        self.terminal_width = 80  # 기본 터미널 너비
+        self.terminal_height = 24  # 기본 터미널 높이
         
     def connect(self, hostname, username, password, port=22):
         try:
@@ -37,9 +39,18 @@ class SSHSession:
             self.client.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             self.client.connect(hostname, port=port, username=username, password=password)
             
-            self.channel = self.client.invoke_shell()
+            # PTY 크기와 함께 쉘 호출
+            self.channel = self.client.invoke_shell(
+                term='xterm-256color',  # 터미널 타입 설정
+                width=self.terminal_width,
+                height=self.terminal_height,
+                width_pixels=0,
+                height_pixels=0
+            )
             self.channel.settimeout(0.1)
             self.connected = True
+            
+            print(f"SSH 연결 성공 - 터미널 크기: {self.terminal_width}x{self.terminal_height}")
             
             # 출력 읽기 스레드 시작
             self.output_thread = threading.Thread(target=self._read_output)
@@ -70,6 +81,23 @@ class SSHSession:
                 return True
             except Exception as e:
                 print(f"명령어 전송 실패: {e}")
+                return False
+        return False
+    
+    def resize_terminal(self, cols, rows):
+        """터미널 크기 조정"""
+        if self.channel and self.connected:
+            try:
+                # 터미널 크기 업데이트
+                self.terminal_width = cols
+                self.terminal_height = rows
+                
+                # PTY 크기 조정
+                self.channel.resize_pty(width=cols, height=rows, width_pixels=0, height_pixels=0)
+                print(f"터미널 크기 조정 완료: {cols}x{rows}")
+                return True
+            except Exception as e:
+                print(f"터미널 크기 조정 실패: {e}")
                 return False
         return False
     
@@ -276,6 +304,19 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             elif message["type"] == "command":
                 # 명령어 전송
                 ssh_session.send_command(message["data"])
+            
+            elif message["type"] == "resize":
+                # 터미널 크기 조정
+                cols = message.get("cols", 80)
+                rows = message.get("rows", 24)
+                success = ssh_session.resize_terminal(cols, rows)
+                
+                await websocket.send_text(json.dumps({
+                    "type": "resize_result",
+                    "success": success,
+                    "cols": cols,
+                    "rows": rows
+                }))
             
             elif message["type"] == "disconnect":
                 # 연결 종료 요청
