@@ -1,5 +1,26 @@
+# FastAPI 웹 프레임워크
 fastapi==0.104.1
+
+# ASGI 서버 (uvicorn with standard extras for production)
 uvicorn[standard]==0.24.0
+
+# WebSocket 지원
 websockets==12.0
+
+# SSH/SFTP 클라이언트 라이브러리
 paramiko==3.3.1
+
+# 파일 업로드 처리를 위한 multipart 지원
 python-multipart==0.0.6
+
+# 추가 유틸리티 (이미 포함된 것들이지만 명시적으로)
+# typing - Python 3.5+ 내장
+# asyncio - Python 3.4+ 내장
+# threading - Python 표준 라이브러리
+# queue - Python 표준 라이브러리
+# json - Python 표준 라이브러리
+# os - Python 표준 라이브러리
+# stat - Python 표준 라이브러리
+# time - Python 표준 라이브러리
+# pathlib - Python 3.4+ 내장
+# io - Python 표준 라이브러리
